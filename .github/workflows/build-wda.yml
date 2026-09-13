@@ -28,16 +28,15 @@ jobs:
             -derivedDataPath ./DerivedData \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
 
-      - name: Package into WebDriverAgent.ipa (strip embedded XCTest frameworks)
+      - name: Package into WebDriverAgent.ipa (strip embedded XCTest frameworks, Appium way)
         run: |
           set -e
           APP=$(find ./DerivedData/Build/Products -name "WebDriverAgentRunner-Runner.app" -type d | head -1)
           echo "Runner app: $APP"
-          echo "=== Frameworks BEFORE ==="; ls "$APP/Frameworks" 2>/dev/null || true
-          for fw in XCTest XCTestCore XCTAutomationSupport XCUIAutomation XCUnit Testing XCTestSupport XCTestIDEInterface; do
-            rm -rf "$APP/Frameworks/$fw.framework"
-          done
-          echo "=== Frameworks AFTER ==="; ls "$APP/Frameworks" 2>/dev/null || true
+          FW="$APP/Frameworks"
+          echo "=== Frameworks BEFORE ==="; ls "$FW" 2>/dev/null || true
+          rm -rf "$FW"/XC*.framework "$FW"/Testing.framework "$FW"/libXCTestSwiftSupport.dylib 2>/dev/null || true
+          echo "=== Frameworks AFTER ==="; ls "$FW" 2>/dev/null || true
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -r WebDriverAgent.ipa Payload >/dev/null
