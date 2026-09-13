@@ -1,0 +1,51 @@
+name: Build WebDriverAgent IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Pick newest Xcode
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          xcodebuild -version
+
+      - name: Checkout appium/WebDriverAgent
+        uses: actions/checkout@v4
+        with:
+          repository: appium/WebDriverAgent
+          ref: master
+
+      - name: Build WDA (unsigned)
+        run: |
+          set -e
+          xcodebuild build-for-testing \
+            -project WebDriverAgent.xcodeproj \
+            -scheme WebDriverAgentRunner \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ./DerivedData \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+
+      - name: Package into WebDriverAgent.ipa (strip embedded XCTest frameworks)
+        run: |
+          set -e
+          APP=$(find ./DerivedData/Build/Products -name "WebDriverAgentRunner-Runner.app" -type d | head -1)
+          echo "Runner app: $APP"
+          echo "=== Frameworks BEFORE ==="; ls "$APP/Frameworks" 2>/dev/null || true
+          for fw in XCTest XCTestCore XCTAutomationSupport XCUIAutomation XCUnit Testing XCTestSupport XCTestIDEInterface; do
+            rm -rf "$APP/Frameworks/$fw.framework"
+          done
+          echo "=== Frameworks AFTER ==="; ls "$APP/Frameworks" 2>/dev/null || true
+          rm -rf Payload && mkdir Payload
+          cp -R "$APP" Payload/
+          zip -r WebDriverAgent.ipa Payload >/dev/null
+          ls -la WebDriverAgent.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WebDriverAgent-ipa
+          path: WebDriverAgent.ipa
+          retention-days: 7
