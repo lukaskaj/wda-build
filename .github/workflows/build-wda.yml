@@ -28,15 +28,20 @@ jobs:
             -derivedDataPath ./DerivedData \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
 
-      - name: Package into WebDriverAgent.ipa (strip embedded XCTest frameworks, Appium way)
+      - name: Package (keep libXCTestSwiftSupport, strip XCTest frameworks, remove all sigs)
         run: |
           set -e
           APP=$(find ./DerivedData/Build/Products -name "WebDriverAgentRunner-Runner.app" -type d | head -1)
           echo "Runner app: $APP"
           FW="$APP/Frameworks"
           echo "=== Frameworks BEFORE ==="; ls "$FW" 2>/dev/null || true
-          rm -rf "$FW"/XC*.framework "$FW"/Testing.framework "$FW"/libXCTestSwiftSupport.dylib 2>/dev/null || true
+          rm -rf "$FW"/XC*.framework "$FW"/Testing.framework 2>/dev/null || true
           echo "=== Frameworks AFTER ==="; ls "$FW" 2>/dev/null || true
+          codesign --remove-signature "$APP/PlugIns/WebDriverAgentRunner.xctest/WebDriverAgentRunner" 2>/dev/null || true
+          codesign --remove-signature "$APP/PlugIns/WebDriverAgentRunner.xctest" 2>/dev/null || true
+          for f in "$FW"/*.framework "$FW"/*.dylib; do codesign --remove-signature "$f" 2>/dev/null || true; done
+          codesign --remove-signature "$APP" 2>/dev/null || true
+          echo "=== signatures removed ==="
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -r WebDriverAgent.ipa Payload >/dev/null
